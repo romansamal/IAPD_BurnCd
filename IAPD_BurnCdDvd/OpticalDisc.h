@@ -12,6 +12,11 @@ private:
 public:
 	OpticalDisc();
 	long int getDeviceCount();
+	void checkMedia();
+	long int getMediaSectors();
+	IMAPI_FORMAT2_DATA_MEDIA_STATE getMediaState();
+	IMAPI_MEDIA_PHYSICAL_TYPE getMediaType();
+	bool isMediaSupported();
 	~OpticalDisc();
 };
 
