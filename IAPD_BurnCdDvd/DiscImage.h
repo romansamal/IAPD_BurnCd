@@ -11,10 +11,13 @@ class DiscImage
 {
 private:
 	IFileSystemImage *image;
-	long long size;
+	double size;
+	double maxSize;
 public:
-	DiscImage();
-	bool addData(string path);
+	DiscImage(double maxSize);
+	bool addData(string path, double size);
+	double getFreeSize();
+	double getCurrentSize();
 	~DiscImage();
 };
 
