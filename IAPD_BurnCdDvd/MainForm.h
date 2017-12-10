@@ -1,6 +1,8 @@
 #pragma once
+#include <ShlObj.h>
 #include <Windows.h>
 #include "OpticalDisc.h"
+#include "DiscImage.h"
 #include <imapi2.h>
 #include <imapi2error.h>
 #include <imapi2fs.h>
@@ -11,10 +13,11 @@ namespace IAPDBurnCdDvd {
 	using namespace System;
 	using namespace System::ComponentModel;
 	using namespace System::Collections;
+	using namespace System::Collections::Generic;
 	using namespace System::Windows::Forms;
 	using namespace System::Data;
 	using namespace System::Drawing;
-
+	using namespace System::IO;
 	/// <summary>
 	/// Сводка для MainForm
 	/// </summary>
@@ -128,11 +131,9 @@ namespace IAPDBurnCdDvd {
 			// progressBar1
 			// 
 			this->progressBar1->Location = System::Drawing::Point(3, 340);
-			this->progressBar1->Maximum = 461;
 			this->progressBar1->Name = L"progressBar1";
 			this->progressBar1->Size = System::Drawing::Size(652, 23);
 			this->progressBar1->TabIndex = 1;
-			this->progressBar1->Value = 123;
 			// 
 			// button1
 			// 
@@ -142,6 +143,7 @@ namespace IAPDBurnCdDvd {
 			this->button1->TabIndex = 9;
 			this->button1->Text = L"Add file";
 			this->button1->UseVisualStyleBackColor = true;
+			this->button1->Click += gcnew System::EventHandler(this, &MainForm::button1_Click);
 			// 
 			// mediaType
 			// 
@@ -249,5 +251,70 @@ namespace IAPDBurnCdDvd {
 		}
 #pragma endregion
 
+private: System::Void button1_Click(System::Object^  sender, System::EventArgs^  e) {
+	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	WCHAR szDir[MAX_PATH];
+	BROWSEINFO bInfo;
+	ZeroMemory(&bInfo, sizeof(bInfo));
+	bInfo.pidlRoot = NULL;
+	bInfo.pszDisplayName = szDir;
+	bInfo.lpszTitle = L"Please, select a folder/file"; 
+	bInfo.ulFlags =  BIF_NEWDIALOGSTYLE | BIF_SHAREABLE | BIF_BROWSEINCLUDEFILES;
+	bInfo.lpfn = NULL;
+	bInfo.lParam = 0;
+	bInfo.iImage = -1;
+	LPITEMIDLIST lpItem = SHBrowseForFolder(&bInfo);
+	if (lpItem != NULL)
+	{
+		SHGetPathFromIDList(lpItem, szDir);
+		wstring widePath(szDir);
+		string path(widePath.begin(), widePath.end());
+		String ^pathManaged = gcnew String(path.c_str());
+		getSizeOfSelected(pathManaged);
+		addDirectoryToTree(pathManaged);
+	};
+	return;
+}
+private: long long getSizeOfSelected(String ^path)	{
+	long long value;
+	Scripting::FileSystemObject ^fso = gcnew Scripting::FileSystemObject();
+	if (!System::IO::File::Exists(path))
+	{
+		Scripting::Folder ^folder = fso->GetFolder(path);
+		value = Convert::ToInt64(folder->Size);
+	}
+	else
+	{
+		Scripting::File ^file = fso->GetFile(path);
+		value = Convert::ToDouble(file->Size);
+		
+	}
+	return value;
+	}
+
+private: void addDirectoryToTree(String ^path)
+{
+	Generic::Stack<TreeNode ^>^ stack = gcnew Generic::Stack<TreeNode ^>();
+	DirectoryInfo ^rootDirectory = gcnew DirectoryInfo(path);
+	TreeNode ^node = gcnew TreeNode(rootDirectory->Name);
+	node->Tag = rootDirectory;
+	stack->Push(node);
+	while (stack->Count > 0)
+	{
+		TreeNode ^ currentNode = stack->Pop();
+		DirectoryInfo ^directoryInfo = (DirectoryInfo ^)currentNode->Tag;
+		for each(DirectoryInfo ^ directory in directoryInfo->GetDirectories())
+		{
+			TreeNode ^ childDirectoryNode = gcnew TreeNode(directory->Name);
+			childDirectoryNode->Tag = directory;
+			currentNode->Nodes->Add(childDirectoryNode);
+			stack->Push(childDirectoryNode);
+		}
+		for each(FileInfo ^file in directoryInfo->GetFiles())
+			currentNode->Nodes->Add(gcnew TreeNode(file->Name));
+	}
+	treeView1->Nodes->Add(node);
+}
 };
+
 }

@@ -8,11 +8,11 @@ OpticalDisc::OpticalDisc()
 
 OpticalDisc::~OpticalDisc()
 {
+	CoUninitialize();
 }
 
 long int OpticalDisc::getDeviceCount()
 {
-	IDiscMaster2 *discManager;
 	LONG k;
 	CoCreateInstance(__uuidof(MsftDiscMaster2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscMaster2), (void **)&discManager);
 	discManager->get_Count(&k);
@@ -24,9 +24,6 @@ long int OpticalDisc::getDeviceCount()
 
 long int OpticalDisc::getMediaSectors()
 {
-	IDiscMaster2 *discManager;
-	IDiscRecorder2 *discRecorder;
-	IDiscFormat2Data *dataWriter;
 	long int freeSectors = 0;
 	BSTR uniqueId;
 	CoCreateInstance(__uuidof(MsftDiscMaster2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscMaster2), (void **)&discManager);
@@ -41,9 +38,6 @@ long int OpticalDisc::getMediaSectors()
 
 IMAPI_FORMAT2_DATA_MEDIA_STATE OpticalDisc::getMediaState()
 {
-	IDiscMaster2 *discManager;
-	IDiscRecorder2 *discRecorder;
-	IDiscFormat2Data *dataWriter;
 	IMAPI_FORMAT2_DATA_MEDIA_STATE state;
 	long int freeSectors = 0;
 	BSTR uniqueId;
@@ -57,29 +51,78 @@ IMAPI_FORMAT2_DATA_MEDIA_STATE OpticalDisc::getMediaState()
 	return state;
 }
 
-IMAPI_MEDIA_PHYSICAL_TYPE OpticalDisc::getMediaType()
+string OpticalDisc::getMediaType()
 {
-	IDiscMaster2 *discManager;
-	IDiscRecorder2 *discRecorder;
-	IDiscFormat2Data *dataWriter;
+	string result;
 	IMAPI_MEDIA_PHYSICAL_TYPE type;
 	long int freeSectors = 0;
 	BSTR uniqueId;
-	CoCreateInstance(__uuidof(MsftDiscMaster2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscMaster2), (void **)&discManager);
-	CoCreateInstance(__uuidof(MsftDiscRecorder2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscRecorder2), (void **)&discRecorder);
-	CoCreateInstance(__uuidof(MsftDiscFormat2Data), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscFormat2Data), (void **)&dataWriter);
+	HRESULT hr = CoCreateInstance(__uuidof(MsftDiscMaster2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscMaster2), (void **)&discManager);
+	if (FAILED(hr))
+		return result;
+	hr = CoCreateInstance(__uuidof(MsftDiscRecorder2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscRecorder2), (void **)&discRecorder);
+	if (FAILED(hr))
+		return result;
+	hr = CoCreateInstance(__uuidof(MsftDiscFormat2Data), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscFormat2Data), (void **)&dataWriter);
+	if (FAILED(hr))
+		return result;
 	discManager->get_Item(0, &uniqueId);
 	discRecorder->InitializeDiscRecorder(uniqueId);
 	dataWriter->put_Recorder(discRecorder);
 	dataWriter->get_CurrentPhysicalMediaType(&type);
-	return type;
+	switch (type)
+	{
+		case IMAPI_MEDIA_TYPE_UNKNOWN:
+		{
+			result = "Unknown";
+			break;
+		}
+		case IMAPI_MEDIA_TYPE_CDR:
+		{
+			result = "CD-R";
+			break;
+		}
+		case IMAPI_MEDIA_TYPE_CDROM:
+		{
+			result = "CD-ROM";
+			break;
+		}
+		case IMAPI_MEDIA_TYPE_CDRW:
+		{
+			result = "CD-RW";
+			break;
+		}
+		case IMAPI_MEDIA_TYPE_DVDROM:
+		{
+			result = "DVD-ROM";
+			break;
+		}
+		case IMAPI_MEDIA_TYPE_DVDRAM:
+		{
+			result = "DVD-RAM";
+			break;
+		}
+		case IMAPI_MEDIA_TYPE_DVDPLUSR:
+		{
+			result = "DVD+R";
+			break;
+		}
+		case IMAPI_MEDIA_TYPE_DVDDASHR:
+		{
+			result = "DVD-R";
+			break;
+		}
+		case IMAPI_MEDIA_TYPE_DVDDASHRW:
+		{
+			result = "DVD-RW";
+			break;
+		}
+	}
+	return result;
 }
 
 bool OpticalDisc::isMediaSupported()
 {
-	IDiscMaster2 *discManager;
-	IDiscRecorder2 *discRecorder;
-	IDiscFormat2Data *dataWriter;
 	VARIANT_BOOL isSupported;
 	long int freeSectors = 0;
 	BSTR uniqueId;
