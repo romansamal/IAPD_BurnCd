@@ -5,15 +5,79 @@
 #include <imapi2fs.h>
 #include <imapi2fserror.h>
 #include <cassert>
-#include "OpticalDisc.h"
+#include "OpticalDrive.h"
+#define IMAPI_MESSAGE_VALIDATION 2315
+#define IMAPI_MESSAGE_FORMATTING 2316
+#define IMAPI_MESSAGE_INITIALIZING_HARDWARE 2317
+#define IMAPI_MESSAGE_CALIBRATING_POWER 2318
+#define IMAPI_MESSAGE_WRITING_DATA 2319
+#define IMAPI_MESSAGE_ACTION_FINALIZATION 2320
+#define IMAPI_MESSAGE_ACTION_COMPLETED 2321
 
 
 class BurnEvent : public DDiscFormat2DataEvents
 {
 public:
+	HWND windowHandle;
 	virtual HRESULT __stdcall Update(IDispatch* object, IDispatch* progress)
 	{
-		int k = 0;
+		IDiscFormat2DataEventArgs* progressArg = NULL;
+		HRESULT hr = progress->QueryInterface(IID_PPV_ARGS(&progressArg));
+		LONG percent = 0;
+		IDiscFormat2Data* discFormatData = NULL;
+		hr = object->QueryInterface(IID_PPV_ARGS(&discFormatData));
+		IMAPI_FORMAT2_DATA_WRITE_ACTION currentAction = IMAPI_FORMAT2_DATA_WRITE_ACTION_VALIDATING_MEDIA;
+		progressArg->get_CurrentAction(&currentAction);
+		switch (currentAction)
+		{
+			case IMAPI_FORMAT2_DATA_WRITE_ACTION_WRITING_DATA:
+			{
+				LONG lastLBA, startLBA, sectorCount, writtenSectors;
+				progressArg->get_SectorCount(&sectorCount);
+				progressArg->get_LastWrittenLba(&lastLBA);
+				progressArg->get_StartLba(&startLBA);
+				writtenSectors = lastLBA - startLBA;
+				percent = writtenSectors * 100 / sectorCount;
+				SendMessage(windowHandle, IMAPI_MESSAGE_WRITING_DATA, NULL, percent);
+				break;
+			}
+
+			case IMAPI_FORMAT2_DATA_WRITE_ACTION_VALIDATING_MEDIA:
+			{
+				SendMessage(windowHandle, IMAPI_MESSAGE_VALIDATION, NULL, NULL);
+				break;
+			}
+
+			case IMAPI_FORMAT2_DATA_WRITE_ACTION_FORMATTING_MEDIA:
+			{
+				SendMessage(windowHandle, IMAPI_MESSAGE_FORMATTING, NULL, NULL);
+				break;
+			}
+
+			case IMAPI_FORMAT2_DATA_WRITE_ACTION_INITIALIZING_HARDWARE:
+			{
+				SendMessage(windowHandle, IMAPI_MESSAGE_INITIALIZING_HARDWARE, NULL, NULL);
+				break;
+			}
+
+			case IMAPI_FORMAT2_DATA_WRITE_ACTION_CALIBRATING_POWER:
+			{
+				SendMessage(windowHandle, IMAPI_MESSAGE_CALIBRATING_POWER, NULL, NULL);
+				break;
+			}
+
+			case IMAPI_FORMAT2_DATA_WRITE_ACTION_FINALIZATION:
+			{
+				SendMessage(windowHandle, IMAPI_MESSAGE_ACTION_FINALIZATION, NULL, NULL);
+				break;
+			}
+
+			case IMAPI_FORMAT2_DATA_WRITE_ACTION_COMPLETED:
+			{
+				SendMessage(windowHandle, IMAPI_MESSAGE_ACTION_COMPLETED, NULL, NULL);
+				break;
+			}
+		}
 		return S_OK;
 	}
 
@@ -53,8 +117,9 @@ public:
 	}
 
 
-	BurnEvent()
+	BurnEvent(HWND h)
 	{
+		windowHandle = h;
 		m_ptinfo = NULL;
 
 		HRESULT hr = 0;
@@ -69,7 +134,7 @@ public:
 		}
 	}
 
-	// boilerplate IDispatch implementation based on Typeinfo
+
 	STDMETHODIMP GetTypeInfoCount(UINT FAR *pctinfo)
 	{
 		*pctinfo = 1;

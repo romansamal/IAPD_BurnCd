@@ -1,13 +1,21 @@
 #pragma once
 #include <ShlObj.h>
 #include <Windows.h>
-#include "OpticalDisc.h"
+#include "OpticalDrive.h"
 #include "DiscImage.h"
 #include <imapi2.h>
 #include <imapi2error.h>
 #include <imapi2fs.h>
 #include <imapi2fserror.h>
 #define MB_SIZE 1048576
+#define IMAPI_MESSAGE_VALIDATION 2315
+#define IMAPI_MESSAGE_FORMATTING 2316
+#define IMAPI_MESSAGE_INITIALIZING_HARDWARE 2317
+#define IMAPI_MESSAGE_CALIBRATING_POWER 2318
+#define IMAPI_MESSAGE_WRITING_DATA 2319
+#define IMAPI_MESSAGE_ACTION_FINALIZATION 2320
+#define IMAPI_MESSAGE_ACTION_COMPLETED 2321
+
 
 namespace IAPDBurnCdDvd {
 
@@ -39,9 +47,52 @@ namespace IAPDBurnCdDvd {
 		{
 			switch (m.Msg)
 			{
+			case IMAPI_MESSAGE_VALIDATION:
+			{
+				eventValidatingMedia();
+				break;
+			}
+
+			case IMAPI_MESSAGE_FORMATTING:
+			{
+				eventFormattingMedia();
+				break;
+			}
+
+			case IMAPI_MESSAGE_INITIALIZING_HARDWARE:
+			{
+				eventInitHardware();
+				break;
+			}
+
+			case IMAPI_MESSAGE_CALIBRATING_POWER:
+			{
+				eventCalibrating();
+				break;
+			}
+
+			case IMAPI_MESSAGE_WRITING_DATA:
+			{
+				Int32 value = m.LParam.ToInt32();
+				eventWriting(value);
+				break;
+			}
+
+			case IMAPI_MESSAGE_ACTION_FINALIZATION:
+			{
+				eventWritingFinal();
+				break;
+			}
+
+			case IMAPI_MESSAGE_ACTION_COMPLETED:
+			{
+				eventSuccess();
+				break;
+			}
+
 			case WM_DEVICECHANGE:
 			{
-				OpticalDisc disc;
+				OpticalDrive disc;
 				String ^mediaTypeVal = gcnew String(disc.getMediaType().c_str());
 				this->mediaTypeValue->Text = mediaTypeVal;
 				break;
@@ -52,41 +103,43 @@ namespace IAPDBurnCdDvd {
 			}
 		}
 	private: 
+		DiscImage *image;
 		TableLayoutPanel^ tableLayoutPanel1;
 		Label^ mediaType;
 		Label^ mediaTypeValue;
 		ProgressBar^ progressBar1;
-		Label^ label1;
-		Label^ label2;
-		Label^ label3;
-		Label^ label4;
-		Label^ label5;
-		Label^ label6;
-		Button^ button1;
-		Button^ button3;
-		Button^ button2;
+		TextBox ^box;
+		Label^ labelTotal;
+		Label^ labelFree;
+		Label^ labelUsed;
+		Label^ labelTotalValue;
+		Label^ labelFreeValue;
+		Label^ labelUsedValue;
+		Button^ buttonAddFile;
+		Button^ buttonBurn;
 		TreeView^ treeView1;
 		System::ComponentModel::Container ^components;
 
 		void InitializeComponent(void)
 		{
-			OpticalDisc drive;
+			OpticalDrive drive;
 			this->tableLayoutPanel1 = (gcnew System::Windows::Forms::TableLayoutPanel());
 			this->treeView1 = (gcnew System::Windows::Forms::TreeView());
 			this->progressBar1 = (gcnew System::Windows::Forms::ProgressBar());
-			this->button1 = (gcnew System::Windows::Forms::Button());
+			this->box = (gcnew System::Windows::Forms::TextBox());
+			this->buttonAddFile = (gcnew System::Windows::Forms::Button());
 			this->mediaType = (gcnew System::Windows::Forms::Label());
 			this->mediaTypeValue = (gcnew System::Windows::Forms::Label());
-			this->label1 = (gcnew System::Windows::Forms::Label());
-			this->label2 = (gcnew System::Windows::Forms::Label());
-			this->label3 = (gcnew System::Windows::Forms::Label());
-			this->label4 = (gcnew System::Windows::Forms::Label());
-			this->label5 = (gcnew System::Windows::Forms::Label());
-			this->label6 = (gcnew System::Windows::Forms::Label());
-			this->button3 = (gcnew System::Windows::Forms::Button());
-			this->button2 = (gcnew System::Windows::Forms::Button());
+			this->labelTotal = (gcnew System::Windows::Forms::Label());
+			this->labelFree = (gcnew System::Windows::Forms::Label());
+			this->labelUsed = (gcnew System::Windows::Forms::Label());
+			this->labelTotalValue = (gcnew System::Windows::Forms::Label());
+			this->labelFreeValue = (gcnew System::Windows::Forms::Label());
+			this->labelUsedValue = (gcnew System::Windows::Forms::Label());
+			this->buttonBurn = (gcnew System::Windows::Forms::Button());
 			this->tableLayoutPanel1->SuspendLayout();
 			this->SuspendLayout();
+			this->progressBar1->Maximum = 100;
 			// 
 			// tableLayoutPanel1
 			// 
@@ -95,13 +148,19 @@ namespace IAPDBurnCdDvd {
 				50)));
 			this->tableLayoutPanel1->Controls->Add(this->treeView1, 0, 0);
 			this->tableLayoutPanel1->Controls->Add(this->progressBar1, 0, 1);
+			this->tableLayoutPanel1->Controls->Add(this->box, 0, 2);
 			this->tableLayoutPanel1->Location = System::Drawing::Point(12, 12);
 			this->tableLayoutPanel1->Name = L"tableLayoutPanel1";
-			this->tableLayoutPanel1->RowCount = 2;
-			this->tableLayoutPanel1->RowStyles->Add((gcnew System::Windows::Forms::RowStyle(System::Windows::Forms::SizeType::Percent, 91.84782F)));
-			this->tableLayoutPanel1->RowStyles->Add((gcnew System::Windows::Forms::RowStyle(System::Windows::Forms::SizeType::Percent, 8.152174F)));
+			this->tableLayoutPanel1->RowCount = 3;
+			this->tableLayoutPanel1->RowStyles->Add((gcnew System::Windows::Forms::RowStyle(System::Windows::Forms::SizeType::Percent, 60.0F)));
+			this->tableLayoutPanel1->RowStyles->Add((gcnew System::Windows::Forms::RowStyle(System::Windows::Forms::SizeType::Percent, 10.0F)));
+			this->tableLayoutPanel1->RowStyles->Add((gcnew System::Windows::Forms::RowStyle(System::Windows::Forms::SizeType::Percent, 30.0F)));
 			this->tableLayoutPanel1->Size = System::Drawing::Size(658, 368);
 			this->tableLayoutPanel1->TabIndex = 0;
+
+			this->box->Dock = System::Windows::Forms::DockStyle::Fill;
+			this->box->Enabled = false;
+			this->box->Multiline = true;
 
 			this->treeView1->Dock = System::Windows::Forms::DockStyle::Fill;
 			this->treeView1->Location = System::Drawing::Point(3, 3);
@@ -114,13 +173,13 @@ namespace IAPDBurnCdDvd {
 			this->progressBar1->Size = System::Drawing::Size(652, 23);
 			this->progressBar1->TabIndex = 1;
 
-			this->button1->Location = System::Drawing::Point(673, 323);
-			this->button1->Name = L"button1";
-			this->button1->Size = System::Drawing::Size(75, 23);
-			this->button1->TabIndex = 9;
-			this->button1->Text = L"Add file";
-			this->button1->UseVisualStyleBackColor = true;
-			this->button1->Click += gcnew System::EventHandler(this, &MainForm::button1_Click);
+			this->buttonAddFile->Location = System::Drawing::Point(673, 205);
+			this->buttonAddFile->Name = L"buttonAddFile";
+			this->buttonAddFile->Size = System::Drawing::Size(75, 23);
+			this->buttonAddFile->TabIndex = 9;
+			this->buttonAddFile->Text = L"Add file";
+			this->buttonAddFile->UseVisualStyleBackColor = true;
+			this->buttonAddFile->Click += gcnew System::EventHandler(this, &MainForm::buttonAddFile_Click);
 
 			this->mediaType->AutoSize = true;
 			this->mediaType->Location = System::Drawing::Point(673, 15);
@@ -137,78 +196,70 @@ namespace IAPDBurnCdDvd {
 			string mediaTypeStr = drive.getMediaType();
 			this->mediaTypeValue->Text = gcnew String(mediaTypeStr.c_str());
 
-			this->label1->AutoSize = true;
-			this->label1->Location = System::Drawing::Point(674, 36);
-			this->label1->Name = L"label1";
-			this->label1->Size = System::Drawing::Size(80, 13);
-			this->label1->TabIndex = 3;
-			this->label1->Text = L"Total size, MB: ";
+			this->labelTotal->AutoSize = true;
+			this->labelTotal->Location = System::Drawing::Point(674, 36);
+			this->labelTotal->Name = L"labelTotal";
+			this->labelTotal->Size = System::Drawing::Size(80, 13);
+			this->labelTotal->TabIndex = 3;
+			this->labelTotal->Text = L"Total size, MB: ";
 
-			this->label2->AutoSize = true;
-			this->label2->Location = System::Drawing::Point(676, 58);
-			this->label2->Name = L"label2";
-			this->label2->Size = System::Drawing::Size(53, 13);
-			this->label2->TabIndex = 4;
-			this->label2->Text = L"Free, MB:";
+			this->labelFree->AutoSize = true;
+			this->labelFree->Location = System::Drawing::Point(676, 58);
+			this->labelFree->Name = L"labelFree";
+			this->labelFree->Size = System::Drawing::Size(53, 13);
+			this->labelFree->TabIndex = 4;
+			this->labelFree->Text = L"Free, MB:";
  
-			this->label3->AutoSize = true;
-			this->label3->Location = System::Drawing::Point(676, 82);
-			this->label3->Name = L"label3";
-			this->label3->Size = System::Drawing::Size(57, 13);
-			this->label3->TabIndex = 5;
-			this->label3->Text = L"Used, MB:";
+			this->labelUsed->AutoSize = true;
+			this->labelUsed->Location = System::Drawing::Point(676, 82);
+			this->labelUsed->Name = L"labelUsed";
+			this->labelUsed->Size = System::Drawing::Size(57, 13);
+			this->labelUsed->TabIndex = 5;
+			this->labelUsed->Text = L"Used, MB:";
 
-			this->label4->AutoSize = true;
-			this->label4->Location = System::Drawing::Point(784, 36);
-			this->label4->Name = L"label4";
-			this->label4->Size = System::Drawing::Size(35, 13);
-			this->label4->TabIndex = 6;
+			this->labelTotalValue->AutoSize = true;
+			this->labelTotalValue->Location = System::Drawing::Point(784, 36);
+			this->labelTotalValue->Name = L"labelTotalValue";
+			this->labelTotalValue->Size = System::Drawing::Size(35, 13);
+			this->labelTotalValue->TabIndex = 6;
 			double totalSize = drive.getTotalMediaSize();
-			this->label4->Text = (gcnew Double(totalSize))->ToString("#.##");
+			this->labelTotalValue->Text = (gcnew Double(totalSize))->ToString("#.##");
 
-			this->label5->AutoSize = true;
-			this->label5->Location = System::Drawing::Point(785, 58);
-			this->label5->Name = L"label5";
-			this->label5->Size = System::Drawing::Size(35, 13);
-			this->label5->TabIndex = 7;
+			this->labelFreeValue->AutoSize = true;
+			this->labelFreeValue->Location = System::Drawing::Point(785, 58);
+			this->labelFreeValue->Name = L"labelFreeValue";
+			this->labelFreeValue->Size = System::Drawing::Size(35, 13);
+			this->labelFreeValue->TabIndex = 7;
 			double freeSize = drive.getFreeMediaSize();
-			this->label5->Text = (gcnew Double(freeSize))->ToString("#.##");
+			this->labelFreeValue->Text = (gcnew Double(freeSize))->ToString("#.##");
 
-			this->label6->AutoSize = true;
-			this->label6->Location = System::Drawing::Point(785, 82);
-			this->label6->Name = L"label6";
-			this->label6->Size = System::Drawing::Size(35, 13);
-			this->label6->TabIndex = 8;
+			this->labelUsedValue->AutoSize = true;
+			this->labelUsedValue->Location = System::Drawing::Point(785, 82);
+			this->labelUsedValue->Name = L"labelUsedValue";
+			this->labelUsedValue->Size = System::Drawing::Size(35, 13);
+			this->labelUsedValue->TabIndex = 8;
 			double usedSize = totalSize - freeSize;
-			this->label6->Text = (gcnew Double(usedSize))->ToString();
+			this->labelUsedValue->Text = (gcnew Double(usedSize))->ToString();
 	 
-			this->button3->Location = System::Drawing::Point(765, 357);
-			this->button3->Name = L"button3";
-			this->button3->Size = System::Drawing::Size(75, 23);
-			this->button3->TabIndex = 11;
-			this->button3->Text = L"Burn!";
-			this->button3->UseVisualStyleBackColor = true;
-
-			this->button2->Location = System::Drawing::Point(765, 323);
-			this->button2->Name = L"button2";
-			this->button2->Size = System::Drawing::Size(75, 23);
-			this->button2->TabIndex = 12;
-			this->button2->Text = L"Delete";
-			this->button2->UseVisualStyleBackColor = true;
-			this->button2->Click += gcnew System::EventHandler(this, &MainForm::button2_Click);
+			this->buttonBurn->Location = System::Drawing::Point(765, 357);
+			this->buttonBurn->Name = L"buttonBurn";
+			this->buttonBurn->Size = System::Drawing::Size(75, 23);
+			this->buttonBurn->TabIndex = 11;
+			this->buttonBurn->Text = L"Burn!";
+			this->buttonBurn->UseVisualStyleBackColor = true;
+			this->buttonBurn->Click += gcnew System::EventHandler(this, &MainForm::buttonBurn_Click);
 
 			this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
 			this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
 			this->ClientSize = System::Drawing::Size(847, 392);
-			this->Controls->Add(this->button2);
-			this->Controls->Add(this->button3);
-			this->Controls->Add(this->label6);
-			this->Controls->Add(this->button1);
-			this->Controls->Add(this->label5);
-			this->Controls->Add(this->label4);
-			this->Controls->Add(this->label3);
-			this->Controls->Add(this->label2);
-			this->Controls->Add(this->label1);
+			this->Controls->Add(this->buttonBurn);
+			this->Controls->Add(this->labelUsedValue);
+			this->Controls->Add(this->buttonAddFile);
+			this->Controls->Add(this->labelFreeValue);
+			this->Controls->Add(this->labelTotalValue);
+			this->Controls->Add(this->labelUsed);
+			this->Controls->Add(this->labelFree);
+			this->Controls->Add(this->labelTotal);
 			this->Controls->Add(this->mediaTypeValue);
 			this->Controls->Add(this->tableLayoutPanel1);
 			this->Controls->Add(this->mediaType);
@@ -222,10 +273,9 @@ namespace IAPDBurnCdDvd {
 			image = new DiscImage(totalSize);
 		}
 
-private: 
-		DiscImage *image;
-		void button1_Click(System::Object^  sender, System::EventArgs^  e) {
+		void buttonAddFile_Click(System::Object^  sender, System::EventArgs^  e) {
 			CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+			progressBar1->Value = 0;
 			WCHAR szDir[MAX_PATH];
 			BROWSEINFO bInfo;
 			ZeroMemory(&bInfo, sizeof(bInfo));
@@ -243,13 +293,21 @@ private:
 				wstring widePath(szDir);
 				string path(widePath.begin(), widePath.end());
 				String ^pathManaged = gcnew String(path.c_str());
-				double size = (double) getSizeOfSelected(pathManaged) / MB_SIZE;
-				image->addData(path, size);
+				double size = (double)getSizeOfSelected(pathManaged) / MB_SIZE;
+				if (!System::IO::File::Exists(pathManaged))
+				{
+					image->addDirData(path, size);
+					addDirectoryToTree(pathManaged);
+				}
+				else
+				{
+					image->addFileData(path, size);
+					addFileToTree(pathManaged);
+				}
 				double free = image->getFreeSize();
 				double current = image->getCurrentSize();
-				this->label5->Text = (gcnew Double(free))->ToString("#.##");
-				this->label6->Text = (gcnew Double(current))->ToString("#.##");
-				addDirectoryToTree(pathManaged);
+				this->labelFreeValue->Text = (gcnew Double(free))->ToString("#.##");
+				this->labelUsedValue->Text = (gcnew Double(current))->ToString("#.##");
 			};
 
 			return;
@@ -272,6 +330,13 @@ private:
 			return value;
 		}
 
+		void addFileToTree(String ^path)
+		{
+			FileInfo ^fileInfo = gcnew FileInfo(path);
+			TreeNode ^node = gcnew TreeNode(fileInfo->Name);
+			treeView1->Nodes->Add(node);
+		}
+		
 		void addDirectoryToTree(String ^path)
 		{
 			Generic::Stack<TreeNode ^>^ stack = gcnew Generic::Stack<TreeNode ^>();
@@ -296,11 +361,70 @@ private:
 			treeView1->Nodes->Add(node);
 		}
 		
-		void button2_Click(System::Object^  sender, System::EventArgs^  e) 
+		void buttonBurn_Click(System::Object^  sender, System::EventArgs^  e) 
 		{
-			OpticalDisc disc;
+			OpticalDrive disc;
 			IFileSystemImage *im = image->getImage();
-			disc.burn(im);
+			disc.burn(im, static_cast<HWND>(Handle.ToPointer()));
+		}
+
+		void eventValidatingMedia()
+		{
+			progressBar1->Value = 0;
+			box->AppendText(DateTime::Now.ToString() + " : Validating that the current media is supported.");
+			box->AppendText(Environment::NewLine);
+			box->ScrollToCaret();
+			return;
+		}
+
+		void eventFormattingMedia()
+		{
+			box->AppendText(DateTime::Now.ToString() + ": Formatting media.");
+			box->AppendText(Environment::NewLine);
+			box->ScrollToCaret();
+			return;
+		}
+
+		void eventInitHardware()
+		{
+			box->AppendText(DateTime::Now.ToString() + " : Initializing the hardware.");
+			box->AppendText(Environment::NewLine);
+			box->ScrollToCaret();
+			return;
+		}
+
+		void eventCalibrating()
+		{
+			box->AppendText(DateTime::Now.ToString() + " : Optimizing laser intensity for writing to the media...");
+			box->AppendText(Environment::NewLine);
+			box->ScrollToCaret();
+			return;
+		}
+
+		void eventWriting(Int32 percent)
+		{
+			box->AppendText(DateTime::Now.ToString() + " : Writing data to the media...");
+			box->AppendText(Environment::NewLine);
+			box->ScrollToCaret();
+			progressBar1->Value = percent;
+			return;
+		}
+
+		void eventWritingFinal()
+		{
+			box->AppendText(DateTime::Now.ToString() + " : Finalizing the write.");
+			box->AppendText(Environment::NewLine);
+			box->ScrollToCaret();
+			return;
+		}
+
+		void eventSuccess()
+		{
+			box->AppendText(DateTime::Now.ToString() + " : Successfully finished!\n");
+			box->AppendText(Environment::NewLine);
+			box->ScrollToCaret();
+			progressBar1->Value = 100;
+			return;
 		}
 };
 

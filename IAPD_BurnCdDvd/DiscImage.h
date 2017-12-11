@@ -7,7 +7,11 @@
 #include <imapi2fserror.h>
 #include <atlbase.h>
 #include <atlstr.h>
+#include <cassert>
+#include <shlwapi.h>
 #include <string>
+#include <comdef.h>
+#pragma comment (lib, "shlwapi.lib")
 using namespace std;
 class DiscImage
 {
@@ -17,7 +21,8 @@ private:
 	double maxSize;
 public:
 	DiscImage(double maxSize);
-	bool addData(string path, double size);
+	bool addDirData(string path, double size);
+	bool addFileData(string path, double size);
 	double getFreeSize();
 	double getCurrentSize();
 	IFileSystemImage *getImage();

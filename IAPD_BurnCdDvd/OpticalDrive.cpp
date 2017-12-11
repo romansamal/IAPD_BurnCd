@@ -1,17 +1,17 @@
-#include "OpticalDisc.h"
+#include "OpticalDrive.h"
 
 
-OpticalDisc::OpticalDisc()
+OpticalDrive::OpticalDrive()
 {
 	CoInitializeEx(NULL, COINIT_MULTITHREADED);
 }
 
-OpticalDisc::~OpticalDisc()
+OpticalDrive::~OpticalDrive()
 {
 	CoUninitialize();
 }
 
-long int OpticalDisc::getDeviceCount()
+long int OpticalDrive::getDeviceCount()
 {
 	LONG k;
 	CoCreateInstance(__uuidof(MsftDiscMaster2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscMaster2), (void **)&discManager);
@@ -22,7 +22,7 @@ long int OpticalDisc::getDeviceCount()
 	return (SUCCEEDED(hr) && isSupported == VARIANT_TRUE) ? k : 0;
 }
 
-long int OpticalDisc::getTotalMediaSectors()
+long int OpticalDrive::getTotalMediaSectors()
 {
 	long int totalSectors = 0;
 	BSTR uniqueId;
@@ -36,7 +36,7 @@ long int OpticalDisc::getTotalMediaSectors()
 	return totalSectors;
 }
 
-long int OpticalDisc::getFreeMediaSectors()
+long int OpticalDrive::getFreeMediaSectors()
 {
 	long int freeSectors = 0;
 	BSTR uniqueId;
@@ -50,7 +50,7 @@ long int OpticalDisc::getFreeMediaSectors()
 	return freeSectors;
 }
 
-IMAPI_FORMAT2_DATA_MEDIA_STATE OpticalDisc::getMediaState()
+IMAPI_FORMAT2_DATA_MEDIA_STATE OpticalDrive::getMediaState()
 {
 	IMAPI_FORMAT2_DATA_MEDIA_STATE state;
 	long int freeSectors = 0;
@@ -65,7 +65,7 @@ IMAPI_FORMAT2_DATA_MEDIA_STATE OpticalDisc::getMediaState()
 	return state;
 }
 
-string OpticalDisc::getMediaType()
+string OpticalDrive::getMediaType()
 {
 	string result;
 	IMAPI_MEDIA_PHYSICAL_TYPE type;
@@ -135,7 +135,7 @@ string OpticalDisc::getMediaType()
 	return result;
 }
 
-bool OpticalDisc::isMediaSupported()
+bool OpticalDrive::isMediaSupported()
 {
 	VARIANT_BOOL isSupported;
 	long int freeSectors = 0;
@@ -149,19 +149,19 @@ bool OpticalDisc::isMediaSupported()
 	return isSupported == VARIANT_TRUE;
 }
 
-double OpticalDisc::getTotalMediaSize()
+double OpticalDrive::getTotalMediaSize()
 {
 	long long size = getTotalMediaSectors() * SECTOR_SIZE;
 	return (double) size / MB_SIZE;
 }
 
-double OpticalDisc::getFreeMediaSize()
+double OpticalDrive::getFreeMediaSize()
 {
 	long long size = getFreeMediaSectors() * SECTOR_SIZE;
 	return (double) size / MB_SIZE;
 }
 
-void OpticalDisc::burn(IFileSystemImage *image)
+void OpticalDrive::burn(IFileSystemImage *image, HWND wnd)
 {
 	BSTR uniqueId;
 	HRESULT hr = CoCreateInstance(__uuidof(MsftDiscMaster2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscMaster2), (void **)&discManager);
@@ -172,7 +172,7 @@ void OpticalDisc::burn(IFileSystemImage *image)
 	dataWriter->put_Recorder(discRecorder);
 	hr = image->ChooseImageDefaults(discRecorder);
 
-	BurnEvent *burnEvent = new BurnEvent();
+	BurnEvent *burnEvent = new BurnEvent(wnd);
 	IConnectionPointContainer* pCPC;
 	IConnectionPoint* pCP;
 	hr = dataWriter->QueryInterface(IID_IConnectionPointContainer, (void**)&pCPC);
@@ -195,7 +195,7 @@ void OpticalDisc::burn(IFileSystemImage *image)
 	return;
 }
 
-IDiscFormat2Data *OpticalDisc::getDataWriter()
+IDiscFormat2Data *OpticalDrive::getDataWriter()
 {
 	return this->dataWriter;
 }

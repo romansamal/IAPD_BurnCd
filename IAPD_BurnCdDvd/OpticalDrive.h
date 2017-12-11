@@ -13,7 +13,7 @@
 #define MB_SIZE 1048576
 
 using namespace std;
-class OpticalDisc
+class OpticalDrive
 {
 private:
 	IDiscMaster2 *discManager;
@@ -21,16 +21,17 @@ private:
 	IDiscFormat2Data *dataWriter;
 	long int getTotalMediaSectors();
 	long int getFreeMediaSectors();
+	static DWORD WINAPI burn(IFileSystemImage *image, HWND wnd);
 public:
-	OpticalDisc();
+	OpticalDrive();
 	long int getDeviceCount();
 	double getTotalMediaSize();
 	double getFreeMediaSize();
 	IMAPI_FORMAT2_DATA_MEDIA_STATE getMediaState();
 	string getMediaType();
 	bool isMediaSupported();
-	void burn(IFileSystemImage *image);
+	void startBurn(IFileSystemImage *image, HWND wnd);
 	IDiscFormat2Data *getDataWriter();
-	~OpticalDisc();
+	~OpticalDrive();
 };
 
