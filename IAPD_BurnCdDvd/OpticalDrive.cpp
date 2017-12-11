@@ -161,8 +161,12 @@ double OpticalDrive::getFreeMediaSize()
 	return (double) size / MB_SIZE;
 }
 
-void OpticalDrive::burn(IFileSystemImage *image, HWND wnd)
+DWORD OpticalDrive::burn(LPVOID pArgs_)
 {
+	ARGS *pArgs = (ARGS*)pArgs_;
+	IDiscMaster2 *discManager;
+	IDiscRecorder2 *discRecorder;
+	IDiscFormat2Data *dataWriter;
 	BSTR uniqueId;
 	HRESULT hr = CoCreateInstance(__uuidof(MsftDiscMaster2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscMaster2), (void **)&discManager);
 	hr = CoCreateInstance(__uuidof(MsftDiscRecorder2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscRecorder2), (void **)&discRecorder);
@@ -170,9 +174,9 @@ void OpticalDrive::burn(IFileSystemImage *image, HWND wnd)
 	discManager->get_Item(0, &uniqueId);
 	discRecorder->InitializeDiscRecorder(uniqueId);
 	dataWriter->put_Recorder(discRecorder);
-	hr = image->ChooseImageDefaults(discRecorder);
+	hr = pArgs->image->ChooseImageDefaults(discRecorder);
 
-	BurnEvent *burnEvent = new BurnEvent(wnd);
+	BurnEvent *burnEvent = new BurnEvent(pArgs->wnd);
 	IConnectionPointContainer* pCPC;
 	IConnectionPoint* pCP;
 	hr = dataWriter->QueryInterface(IID_IConnectionPointContainer, (void**)&pCPC);
@@ -189,13 +193,20 @@ void OpticalDrive::burn(IFileSystemImage *image, HWND wnd)
 	IFileSystemImageResult *result;
 	IStream *stream;
 	dataWriter->put_ClientName(CComBSTR("TEST CLIENT").Detach());
-	hr = image->CreateResultImage(&result);
+	hr = pArgs->image->CreateResultImage(&result);
 	hr = result->get_ImageStream(&stream);
 	hr = dataWriter->Write(stream);
-	return;
+	return 0;
 }
 
 IDiscFormat2Data *OpticalDrive::getDataWriter()
 {
 	return this->dataWriter;
+}
+
+void OpticalDrive::startBurn(IFileSystemImage *image, HWND wnd)
+{
+	LPDWORD id = 0;
+	ARGS args = {image, wnd};
+	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&burn, &args, NULL, id);
 }

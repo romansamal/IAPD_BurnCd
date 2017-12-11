@@ -13,6 +13,14 @@
 #define MB_SIZE 1048576
 
 using namespace std;
+
+
+struct ARGS
+{
+	IFileSystemImage *image;
+	HWND wnd;
+};
+
 class OpticalDrive
 {
 private:
@@ -21,7 +29,7 @@ private:
 	IDiscFormat2Data *dataWriter;
 	long int getTotalMediaSectors();
 	long int getFreeMediaSectors();
-	static DWORD WINAPI burn(IFileSystemImage *image, HWND wnd);
+	static DWORD WINAPI burn(LPVOID pArgs_);
 public:
 	OpticalDrive();
 	long int getDeviceCount();
