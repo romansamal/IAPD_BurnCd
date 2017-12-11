@@ -298,7 +298,9 @@ private:
 		
 		void button2_Click(System::Object^  sender, System::EventArgs^  e) 
 		{
-
+			OpticalDisc disc;
+			IFileSystemImage *im = image->getImage();
+			disc.burn(im);
 		}
 };
 

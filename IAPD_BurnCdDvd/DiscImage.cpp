@@ -19,9 +19,9 @@ bool DiscImage::addData(string path, double size)
 	if (size > maxSize - this->size)
 		return false;
 	IFsiDirectoryItem *dirItem;
-	BSTR bstrPath = SysAllocStringByteLen(path.c_str(), path.size());
+	BSTR bstrPath = CComBSTR(path.c_str()).Detach();
 	image->get_Root(&dirItem);
-	dirItem->AddTree(bstrPath, VARIANT_TRUE);
+	HRESULT hr = dirItem->AddTree(bstrPath, VARIANT_TRUE);
 	this->size += size;
 	return true;
 }
@@ -34,4 +34,9 @@ double DiscImage::getCurrentSize()
 double DiscImage::getFreeSize()
 {
 	return maxSize - size;
+}
+
+IFileSystemImage *DiscImage::getImage()
+{
+	return this->image;
 }

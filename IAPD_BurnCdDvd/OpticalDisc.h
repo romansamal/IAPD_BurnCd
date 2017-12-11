@@ -4,7 +4,14 @@
 #include <imapi2error.h>
 #include <imapi2fs.h>
 #include <imapi2fserror.h>
+#include <atlbase.h>
+#include <atlstr.h>
+#include <atlcom.h>
 #include <string>
+#include "BurnEvent.h"
+#define SECTOR_SIZE 2048
+#define MB_SIZE 1048576
+
 using namespace std;
 class OpticalDisc
 {
@@ -12,14 +19,18 @@ private:
 	IDiscMaster2 *discManager;
 	IDiscRecorder2 *discRecorder;
 	IDiscFormat2Data *dataWriter;
+	long int getTotalMediaSectors();
+	long int getFreeMediaSectors();
 public:
 	OpticalDisc();
 	long int getDeviceCount();
-	void checkMedia();
-	long int getMediaSectors();
+	double getTotalMediaSize();
+	double getFreeMediaSize();
 	IMAPI_FORMAT2_DATA_MEDIA_STATE getMediaState();
 	string getMediaType();
 	bool isMediaSupported();
+	void burn(IFileSystemImage *image);
+	IDiscFormat2Data *getDataWriter();
 	~OpticalDisc();
 };
 

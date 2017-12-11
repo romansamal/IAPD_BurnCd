@@ -22,7 +22,21 @@ long int OpticalDisc::getDeviceCount()
 	return (SUCCEEDED(hr) && isSupported == VARIANT_TRUE) ? k : 0;
 }
 
-long int OpticalDisc::getMediaSectors()
+long int OpticalDisc::getTotalMediaSectors()
+{
+	long int totalSectors = 0;
+	BSTR uniqueId;
+	CoCreateInstance(__uuidof(MsftDiscMaster2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscMaster2), (void **)&discManager);
+	CoCreateInstance(__uuidof(MsftDiscRecorder2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscRecorder2), (void **)&discRecorder);
+	CoCreateInstance(__uuidof(MsftDiscFormat2Data), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscFormat2Data), (void **)&dataWriter);
+	discManager->get_Item(0, &uniqueId);
+	discRecorder->InitializeDiscRecorder(uniqueId);
+	dataWriter->put_Recorder(discRecorder);
+	dataWriter->get_TotalSectorsOnMedia(&totalSectors);
+	return totalSectors;
+}
+
+long int OpticalDisc::getFreeMediaSectors()
 {
 	long int freeSectors = 0;
 	BSTR uniqueId;
@@ -133,4 +147,55 @@ bool OpticalDisc::isMediaSupported()
 	discRecorder->InitializeDiscRecorder(uniqueId);
 	dataWriter->IsCurrentMediaSupported(discRecorder, &isSupported);
 	return isSupported == VARIANT_TRUE;
+}
+
+double OpticalDisc::getTotalMediaSize()
+{
+	long long size = getTotalMediaSectors() * SECTOR_SIZE;
+	return (double) size / MB_SIZE;
+}
+
+double OpticalDisc::getFreeMediaSize()
+{
+	long long size = getFreeMediaSectors() * SECTOR_SIZE;
+	return (double) size / MB_SIZE;
+}
+
+void OpticalDisc::burn(IFileSystemImage *image)
+{
+	BSTR uniqueId;
+	HRESULT hr = CoCreateInstance(__uuidof(MsftDiscMaster2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscMaster2), (void **)&discManager);
+	hr = CoCreateInstance(__uuidof(MsftDiscRecorder2), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscRecorder2), (void **)&discRecorder);
+	hr = CoCreateInstance(__uuidof(MsftDiscFormat2Data), NULL, CLSCTX_INPROC_SERVER, __uuidof(IDiscFormat2Data), (void **)&dataWriter);
+	discManager->get_Item(0, &uniqueId);
+	discRecorder->InitializeDiscRecorder(uniqueId);
+	dataWriter->put_Recorder(discRecorder);
+	hr = image->ChooseImageDefaults(discRecorder);
+
+	BurnEvent *burnEvent = new BurnEvent();
+	IConnectionPointContainer* pCPC;
+	IConnectionPoint* pCP;
+	hr = dataWriter->QueryInterface(IID_IConnectionPointContainer, (void**)&pCPC);
+
+	hr = pCPC->FindConnectionPoint(IID_DDiscFormat2DataEvents, &pCP);
+
+	IUnknown* pSinkUnk;
+	hr = burnEvent->QueryInterface(IID_IUnknown, (void**)&pSinkUnk);
+
+	// Set up advice link
+	DWORD cookie;
+	hr = pCP->Advise(pSinkUnk, &cookie);
+
+	IFileSystemImageResult *result;
+	IStream *stream;
+	dataWriter->put_ClientName(CComBSTR("TEST CLIENT").Detach());
+	hr = image->CreateResultImage(&result);
+	hr = result->get_ImageStream(&stream);
+	hr = dataWriter->Write(stream);
+	return;
+}
+
+IDiscFormat2Data *OpticalDisc::getDataWriter()
+{
+	return this->dataWriter;
 }

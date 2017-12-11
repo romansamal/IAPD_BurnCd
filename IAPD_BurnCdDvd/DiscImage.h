@@ -5,6 +5,8 @@
 #include <imapi2error.h>
 #include <imapi2fs.h>
 #include <imapi2fserror.h>
+#include <atlbase.h>
+#include <atlstr.h>
 #include <string>
 using namespace std;
 class DiscImage
@@ -18,6 +20,7 @@ public:
 	bool addData(string path, double size);
 	double getFreeSize();
 	double getCurrentSize();
+	IFileSystemImage *getImage();
 	~DiscImage();
 };
 
