@@ -21,8 +21,9 @@ private:
 	double maxSize;
 public:
 	DiscImage(double maxSize);
-	bool addDirData(string path, double size);
-	bool addFileData(string path, double size);
+	bool addDirData(wstring path, double size);
+	bool addFileData(wstring path, double size);
+	bool changeMaxSize(double maxSize);
 	double getFreeSize();
 	double getCurrentSize();
 	IFileSystemImage *getImage();

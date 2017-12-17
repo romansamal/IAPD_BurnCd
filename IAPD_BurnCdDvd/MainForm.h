@@ -7,6 +7,7 @@
 #include <imapi2error.h>
 #include <imapi2fs.h>
 #include <imapi2fserror.h>
+#include <codecvt>
 #define MB_SIZE 1048576
 #define IMAPI_MESSAGE_VALIDATION 2315
 #define IMAPI_MESSAGE_FORMATTING 2316
@@ -16,7 +17,7 @@
 #define IMAPI_MESSAGE_ACTION_FINALIZATION 2320
 #define IMAPI_MESSAGE_ACTION_COMPLETED 2321
 #define CD_SIZE 740
-#define DVD_SIZE 4000
+#define DVD_SIZE 4700
 
 namespace IAPDBurnCdDvd {
 
@@ -95,24 +96,39 @@ namespace IAPDBurnCdDvd {
 
 			case WM_DEVICECHANGE:
 			{
-				Sleep(500);
-				OpticalDrive drive;
-				String ^mediaTypeVal = gcnew String(drive.getMediaType().c_str());
-				buttonBurn->Enabled = true;
-				combo->Enabled = false;
+				vector<string> devices = OpticalDrive::getAvailableDrives();
+				OpticalDrive drive(devices[comboDrive->SelectedIndex]);
+				string typeOfMedia;
+				while (true)
+				{
+					typeOfMedia = drive.getMediaType();
+					if (typeOfMedia != "")
+						break;
+				}
+				String ^mediaTypeVal = gcnew String(typeOfMedia.c_str());
+				this->mediaTypeValue->Text = mediaTypeVal;
 				if (mediaTypeVal == "Unknown")
 				{
 					buttonBurn->Enabled = false;
-					combo->Enabled = true;
-					combo->SelectedIndex = 0;
+					comboTemplate->Enabled = true;
+					comboTemplate->SelectedIndex = 0;
 				}
-				/*this->mediaTypeValue->Text = mediaTypeVal;
-				double totalSize = drive.getTotalMediaSize();
-				this->labelTotalValue->Text = (gcnew Double(totalSize))->ToString("#.##");
-				double freeSize = drive.getFreeMediaSize();
-				this->labelFreeValue->Text = (gcnew Double(freeSize))->ToString("#.##");
-				double usedSize = totalSize - freeSize;
-				this->labelUsedValue->Text = (gcnew Double(usedSize))->ToString();*/
+				else
+				{
+					buttonBurn->Enabled = true;
+					comboTemplate->Enabled = false;
+					double totalSize = drive.getTotalMediaSize();
+					if (totalSize == 0)
+						break;
+					this->labelTotalValue->Text = (gcnew Double(totalSize))->ToString("#.##");
+					if (!this->image->changeMaxSize(totalSize))
+					{
+						MessageBox::Show("There are no enough space :(", "Error", MessageBoxButtons::OK);
+						break;
+					}
+					double free = image->getFreeSize();
+					this->labelFreeValue->Text = (gcnew Double(free))->ToString("#.##");
+				}
 				break;
 			}
 
@@ -123,6 +139,7 @@ namespace IAPDBurnCdDvd {
 	private: 
 		NotifyIcon ^icon;
 		DiscImage *image;
+		DateTime ^lastNotification;
 		TableLayoutPanel^ tableLayoutPanel1;
 		Label^ mediaType;
 		Label^ mediaTypeValue;
@@ -137,7 +154,8 @@ namespace IAPDBurnCdDvd {
 		Button^ buttonAddFile;
 		Button^ buttonBurn;
 		TreeView^ treeView1;
-		ComboBox ^combo;
+		ComboBox ^comboTemplate;
+		ComboBox ^comboDrive;
 		System::ComponentModel::Container ^components;
 
 		void formResize(System::Object^  sender, System::EventArgs^  e)
@@ -153,12 +171,12 @@ namespace IAPDBurnCdDvd {
 			}
 		}
 
-		void comboChanged(System::Object^  sender, System::EventArgs^  e)
+		void comboTemplateChanged(System::Object^  sender, System::EventArgs^  e)
 		{
 			if (image)
 				delete image;
 			treeView1->Nodes->Clear();
-			Double size = combo->SelectedItem == "CD" ? CD_SIZE : DVD_SIZE;
+			Double size = comboTemplate->SelectedItem == "CD" ? CD_SIZE : DVD_SIZE;
 			image = new DiscImage(size);
 			this->labelTotalValue->Text = (gcnew Double(size))->ToString("#.##");
 			double free = image->getFreeSize();
@@ -166,6 +184,39 @@ namespace IAPDBurnCdDvd {
 			double used = image->getCurrentSize();
 			this->labelUsedValue->Text = (gcnew Double(used))->ToString("#.##");
 		}
+
+		void comboDriveChanged(System::Object^  sender, System::EventArgs^  e)
+		{
+			buttonBurn->Enabled = true;
+			vector<string> devices = OpticalDrive::getAvailableDrives();
+			OpticalDrive device(devices[comboDrive->SelectedIndex]);
+			string mediaTypeStr = device.getMediaType();
+			this->mediaTypeValue->Text = gcnew String(mediaTypeStr.c_str());
+			if (mediaTypeStr == "Unknown")
+			{
+				buttonBurn->Enabled = false;
+				comboTemplate->Enabled = true;
+				comboTemplate->SelectedIndex = 0;
+			}
+			else
+			{
+				double size = device.getTotalMediaSize();
+				if (size == 0)
+					return;
+				if (!image->changeMaxSize(size))
+				{
+					MessageBox::Show("There are no enough space :(", "Error", MessageBoxButtons::OK);
+					return;
+				}
+				this->labelTotalValue->Text = (gcnew Double(size))->ToString("#.##");
+				double free = image->getFreeSize();
+				this->labelFreeValue->Text = (gcnew Double(free))->ToString("#.##");
+				double used = image->getCurrentSize();
+				this->labelUsedValue->Text = (gcnew Double(used))->ToString("#.##");
+			}
+			
+		}
+
 
 		void iconDoubleClick(System::Object^ sender, System::EventArgs^  e)
 		{
@@ -176,7 +227,8 @@ namespace IAPDBurnCdDvd {
 
 		void InitializeComponent(void)
 		{
-			OpticalDrive drive;
+			vector<string> devices = OpticalDrive::getAvailableDrives();
+			lastNotification = gcnew DateTime();
 			this->icon = (gcnew System::Windows::Forms::NotifyIcon());
 			this->tableLayoutPanel1 = (gcnew System::Windows::Forms::TableLayoutPanel());
 			this->treeView1 = (gcnew System::Windows::Forms::TreeView());
@@ -192,10 +244,11 @@ namespace IAPDBurnCdDvd {
 			this->labelFreeValue = (gcnew System::Windows::Forms::Label());
 			this->labelUsedValue = (gcnew System::Windows::Forms::Label());
 			this->buttonBurn = (gcnew System::Windows::Forms::Button());
-			this->combo = (gcnew System::Windows::Forms::ComboBox());
-			combo->Items->Add("CD");
-			combo->Items->Add("DVD");
-			combo->SelectedValueChanged += gcnew System::EventHandler(this, &MainForm::comboChanged);
+			this->comboTemplate = (gcnew System::Windows::Forms::ComboBox());
+			this->comboDrive = (gcnew System::Windows::Forms::ComboBox());
+			comboTemplate->Items->Add("CD");
+			comboTemplate->Items->Add("DVD");
+			comboTemplate->SelectedValueChanged += gcnew System::EventHandler(this, &MainForm::comboTemplateChanged);
 			this->tableLayoutPanel1->SuspendLayout();
 			this->SuspendLayout();
 			this->progressBar1->Maximum = 100;
@@ -252,6 +305,7 @@ namespace IAPDBurnCdDvd {
 			this->mediaType->TabIndex = 1;
 			this->mediaType->Text = L"Type of media: ";
 
+			OpticalDrive drive(devices[0]);
 			this->mediaTypeValue->AutoSize = true;
 			this->mediaTypeValue->Location = System::Drawing::Point(785, 15);
 			this->mediaTypeValue->Name = L"mediaTypeValue";
@@ -267,7 +321,13 @@ namespace IAPDBurnCdDvd {
 			this->labelTotal->TabIndex = 3;
 			this->labelTotal->Text = L"Total size, MB: ";
 
-			this->combo->Location = System::Drawing::Point(680, 150);
+			this->comboTemplate->Location = System::Drawing::Point(680, 150);
+			this->comboTemplate->Width = 160;
+			this->comboTemplate->Enabled = false;
+
+			this->comboDrive->Location = System::Drawing::Point(680, 100);
+			this->comboDrive->Width = 160;
+			
 
 			this->labelFree->AutoSize = true;
 			this->labelFree->Location = System::Drawing::Point(676, 58);
@@ -329,7 +389,8 @@ namespace IAPDBurnCdDvd {
 			this->Controls->Add(this->mediaTypeValue);
 			this->Controls->Add(this->tableLayoutPanel1);
 			this->Controls->Add(this->mediaType);
-			this->Controls->Add(this->combo);
+			this->Controls->Add(this->comboTemplate);
+			this->Controls->Add(this->comboDrive);
 			this->FormBorderStyle = System::Windows::Forms::FormBorderStyle::FixedSingle;
 			this->Name = L"MainForm";
 			this->Text = L"CD Burn";
@@ -340,11 +401,13 @@ namespace IAPDBurnCdDvd {
 			if (mediaTypeStr == "Unknown")
 			{
 				buttonBurn->Enabled = false;
-				combo->Enabled = true;
-				combo->SelectedIndex = 0;
+				comboTemplate->Enabled = true;
+				comboTemplate->SelectedIndex = 0;
 			}
+			initComboDrive();
 			if (!image)
 			image = new DiscImage(totalSize);
+			this->comboDrive->SelectedValueChanged += gcnew System::EventHandler(this, &MainForm::comboDriveChanged);
 		}
 
 		void buttonAddFile_Click(System::Object^  sender, System::EventArgs^  e) {
@@ -365,12 +428,15 @@ namespace IAPDBurnCdDvd {
 			{
 				SHGetPathFromIDList(lpItem, szDir);
 				wstring widePath(szDir);
-				string path(widePath.begin(), widePath.end());
-				String ^pathManaged = gcnew String(path.c_str());
+				String ^pathManaged = gcnew String(widePath.c_str());
+				String ^name = Path::GetFileName(pathManaged);
+				cli::array<TreeNode ^> ^nodes = treeView1->Nodes->Find(Path::GetFileName(pathManaged), false);
+				if (nodes->Length != 0)
+					return;
 				double size = (double)getSizeOfSelected(pathManaged) / MB_SIZE;
 				if (!System::IO::File::Exists(pathManaged))
 				{
-					if (!image->addDirData(path, size))
+					if (!image->addDirData(widePath, size))
 					{
 						MessageBox::Show("Error", "Error", MessageBoxButtons::OK);
 						return;
@@ -379,7 +445,7 @@ namespace IAPDBurnCdDvd {
 				}
 				else
 				{
-					if (!image->addFileData(path, size))
+					if (!image->addFileData(widePath, size))
 					{
 						MessageBox::Show("Error", "Error", MessageBoxButtons::OK);
 						return;
@@ -416,6 +482,7 @@ namespace IAPDBurnCdDvd {
 		{
 			FileInfo ^fileInfo = gcnew FileInfo(path);
 			TreeNode ^node = gcnew TreeNode(fileInfo->Name);
+			node->Name = fileInfo->Name;
 			treeView1->Nodes->Add(node);
 		}
 		
@@ -425,6 +492,7 @@ namespace IAPDBurnCdDvd {
 			DirectoryInfo ^rootDirectory = gcnew DirectoryInfo(path);
 			TreeNode ^node = gcnew TreeNode(rootDirectory->Name);
 			node->Tag = rootDirectory;
+			node->Name = rootDirectory->Name;
 			stack->Push(node);
 			while (stack->Count > 0)
 			{
@@ -445,21 +513,29 @@ namespace IAPDBurnCdDvd {
 		
 		void buttonBurn_Click(System::Object^  sender, System::EventArgs^  e) 
 		{
-			OpticalDrive disc;
+			if (comboDrive->Items->Count == 0)
+			{
+				MessageBox::Show("Error", "Error", MessageBoxButtons::OK);
+				return;
+			}
+			vector<string> devices = OpticalDrive::getAvailableDrives();
+			OpticalDrive disc(devices.at(comboDrive->SelectedIndex));
 			IFileSystemImage *im = image->getImage();
 			disc.startBurn(im, static_cast<HWND>(Handle.ToPointer()));
+			buttonBurn->Enabled = false;
 		}
 
 		void eventValidatingMedia()
 		{
-			buttonBurn->Enabled = false;
 			progressBar1->Value = 0;
 			box->AppendText(DateTime::Now.ToString() + " : Validating that the current media is supported.");
 			box->AppendText(Environment::NewLine);
 			box->ScrollToCaret();
 			if (icon->Visible == true)
+			{
 				icon->BalloonTipText = "Validating that the current media is supported.";
-			icon->ShowBalloonTip(1500);
+				icon->ShowBalloonTip(500);
+			}
 			return;
 		}
 
@@ -469,8 +545,10 @@ namespace IAPDBurnCdDvd {
 			box->AppendText(Environment::NewLine);
 			box->ScrollToCaret();
 			if (icon->Visible == true)
+			{
 				icon->BalloonTipText = "Formatting media.";
-			icon->ShowBalloonTip(1500);
+				icon->ShowBalloonTip(500);
+			}
 			return;
 		}
 
@@ -480,8 +558,10 @@ namespace IAPDBurnCdDvd {
 			box->AppendText(Environment::NewLine);
 			box->ScrollToCaret();
 			if (icon->Visible == true)
+			{
 				icon->BalloonTipText = "Initializing the hardware.";
-			icon->ShowBalloonTip(1500);
+				icon->ShowBalloonTip(500);
+			}
 			return;
 		}
 
@@ -491,8 +571,10 @@ namespace IAPDBurnCdDvd {
 			box->AppendText(Environment::NewLine);
 			box->ScrollToCaret();
 			if (icon->Visible == true)
+			{
 				icon->BalloonTipText = "Optimizing laser intensity for writing to the media...";
-			icon->ShowBalloonTip(1500);
+				icon->ShowBalloonTip(500);
+			}
 			return;
 		}
 
@@ -501,6 +583,18 @@ namespace IAPDBurnCdDvd {
 			box->AppendText(DateTime::Now.ToString() + " : Writing data to the media...");
 			box->AppendText(Environment::NewLine);
 			box->ScrollToCaret();
+			if (percent == 0 && icon->Visible == true)
+			{
+				icon->BalloonTipText = "Writing data started...";
+				icon->ShowBalloonTip(500);
+			}
+			
+			if ((DateTime::Now - *lastNotification).Seconds > 10 && icon->Visible == true)
+			{
+				icon->BalloonTipText = "Writing data... " + percent + "%";
+				icon->ShowBalloonTip(300);
+				lastNotification = DateTime::Now;
+			}
 			progressBar1->Value = percent;
 			return;
 		}
@@ -510,9 +604,6 @@ namespace IAPDBurnCdDvd {
 			box->AppendText(DateTime::Now.ToString() + " : Finalizing the write.");
 			box->AppendText(Environment::NewLine);
 			box->ScrollToCaret();
-			if (icon->Visible == true)
-				icon->BalloonTipText = "Finalizing the write.";
-			icon->ShowBalloonTip(1500);
 			return;
 		}
 
@@ -523,10 +614,32 @@ namespace IAPDBurnCdDvd {
 			box->ScrollToCaret();
 			progressBar1->Value = 100;
 			if (icon->Visible == true)
+			{
 				icon->BalloonTipText = "Successfully finished!";
-			icon->ShowBalloonTip(3000);
+				icon->ShowBalloonTip(1000);
+			}
 			buttonBurn->Enabled = true;
+			box->ScrollToCaret();
 			return;
+		}
+
+		void initComboDrive()
+		{
+			vector<string> devices = OpticalDrive::getAvailableDrives();
+			if (devices.size() == 0)
+			{
+				comboDrive->Enabled = false;
+			}
+			for (int i = 0; i < devices.size(); i++)
+			{
+				vector<string> nameOfDevice = OpticalDrive::getDriveName(devices[i]);
+				for (int j = 0; j < nameOfDevice.size(); j++)
+				{
+					String ^nameManaged = gcnew String(nameOfDevice[j].c_str());
+					comboDrive->Items->Add(nameManaged);
+				}
+			}
+			comboDrive->SelectedIndex = 0;
 		}
 };
 
